@@ -1,0 +1,90 @@
+---
+title: "GeneralDimorphismCode"
+output: html_document
+---
+
+# Weight and Nested ANOVAs 
+
+Boxplot
+```
+library(ggplot2)
+ggplot(BodyMassData, aes(x=Age, y=Weight, fill=Sex)) + geom_boxplot()
+```
+Nested ANOVA
+
+```
+library(car)
+###Convert the independent variables to factors for the ANOVA to group by
+BodyMassData$Sex<-as.factor(BodyMassData$Sex)
+BodyMassData$Age<-as.factor(BodyMassData$Age)
+```
+
+Look at boxplot to check the assumption of normality
+```
+boxplot(Weight~Sex,data=BodyMassData)
+boxplot(Weight~Age,data=BodyMassData)
+```
+
+Fitting the model
+
+* Sex is nested within age, for the example site is nested within season
+* Use aov function to fit an ANOVA
+* To indicate that sex is nested within age we use a / operation in the aov call:
+```
+model.BodyMassData<-aov(Weight~Age/Sex,data=BodyMassData)
+####OR####
+model.BodyMassData<-aov(Weight~Age+Sex%in%Age,data=BodyMassData)
+```
+
+to look at the results, call the summary function on the model object I just created
+```
+summary(model.BodyMassData)
+##Summary results:
+##              Df Sum Sq Mean Sq F value Pr(>F)    
+##Age           5  33.50   6.700 105.336 <2e-16 ***
+##Age:Sex       6   0.36   0.059   0.932  0.475    
+##Residuals   108   6.87   0.064                   
+```
+
+Explanation of the results
+
+* 2 null hypotheses in an ANOVA. First is that there's no effect of A, second is that there's no effect of B nested within A.
+* P-values show there's a significant result for Age, but not for Sex nested in Age.
+* So can reject the null hypothesis that there's no effect of Age, but fail to reject the second null hypothesis.
+
+
+**DIAGNOSTIC: evaluate the residuals**
+
+Make a residuals vs fitted values plot
+```
+plot(model.BodyMassData$residuals~model.BodyMassData$fitted.values)
+```
+
+I want to do a t-test for just ages 5, so I've uploaded a new excel file 
+```
+attach(AdultsOnly)
+```
+
+Just looking
+```
+boxplot(Weight~Sex)
+```
+
+* H0: mean weight of females = mean weight of males
+* two sided test
+* assume non-equal variances
+
+* mu=0 -> means null hypothesis is that the mean difference is 0
+* alt -> alternative being used is a two-sided
+* confidence interval of 95%
+* assuming variances are equal and that these two groups aren't paired
+```
+t.test(Weight~Sex, mu=0, alt="two.sided", conf=0.95, var.eq=F, paired=F, data=AdultsOnly)
+```
+Decide on variance in two ways:
+1. Look at the boxplot, see if they have similar variations in weight (F seems more)
+2. Compare the actual variances--see below
+```
+var(Weight[Sex=="F"])
+var(Weight[Sex=="M"])
+```
