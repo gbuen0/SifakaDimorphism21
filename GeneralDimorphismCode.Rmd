@@ -84,7 +84,917 @@ t.test(Weight~Sex, mu=0, alt="two.sided", conf=0.95, var.eq=F, paired=F, data=Ad
 Decide on variance in two ways:
 1. Look at the boxplot, see if they have similar variations in weight (F seems more)
 2. Compare the actual variances--see below
-```
+``` 
 var(Weight[Sex=="F"])
 var(Weight[Sex=="M"])
 ```
+
+* Calculations from end of sperm competition, to examined female and male weight. 
+Adding females
+```{r}
+library(readxl)
+WeightComparisons326 <- read_excel("~/Google Drive/Projects/Body Dimorphism/WeightComparisons326.xlsx")
+```
+
+Subsetting
+```{r}
+FemAndMM <- WeightComparisons326[with(WeightComparisons326, Sex == "F" | GroupComp == "MM"), ]
+FemAndSM <- WeightComparisons326[with(WeightComparisons326, Sex == "F" | GroupComp == "SM"), ]
+```
+
+Females and MM
+```{r}
+group_by(FemAndMM, Sex) %>%
+  summarise(
+    median = median(Weight, na.rm = TRUE),
+    mean = mean(Weight, na.rm = TRUE),
+    IQR = IQR(Weight, na.rm = TRUE),
+    SD = sd(Weight, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(Weight ~ Sex, data = FemAndMM)
+```
+
+
+
+
+
+# Looking at weight of all males--line chart
+```
+ggplot(AdultMales, aes(x=CaptureDate, y=Weight, color=LemurID)) +geom_line()
+```
+
+
+
+# Leg Length
+
+Data Notes
+
+* Micka was excluded--his leg length is too variable
+
+1. I've uploaded `LegLengthAdultAvg`. 
+
+2. Let's subset it into male and female leg length averages
+```
+FLeg <- LegLengthAdultAvg[LegLengthAdultAvg$Sex == "F", ]
+MLeg <- LegLengthAdultAvg[LegLengthAdultAvg$Sex == "M", ]
+```
+3. First, I'm running a Shapiro test to test normality (because I will be using a one-tailed independent t-test, so I must test normality and variance)
+```
+shapiro.test(MLeg$AvgLegLength)
+
+	Shapiro-Wilk normality test
+
+data:  MLeg$AvgLegLength
+W = 0.96085, p-value = 0.3256
+#######
+shapiro.test(FLeg$AvgLegLength)
+
+	Shapiro-Wilk normality test
+
+data:  FLeg$AvgLegLength
+W = 0.89398, p-value = 0.06441
+```
+Both p-values are greater than 0.05, so I can assume normality.
+
+4. Now I'm running an f-test to test the variance
+```
+var.test(AvgLegLength ~ Sex, data = LegLengthAdultAvg)
+############
+	F test to compare two variances
+
+data:  AvgLegLength by Sex
+F = 1.557, num df = 15, denom df = 29, p-value = 0.2982
+alternative hypothesis: true ratio of variances is not equal to 1
+95 percent confidence interval:
+ 0.6697303 4.1286781
+sample estimates:
+ratio of variances 
+             1.557 
+```
+The p-value is greater than 0.05, so there is no significant difference between the variances. 
+
+
+
+
+# Sperm Competition: Actually Working on (Aaron look here!)
+
+This section is for more focused models of the sperm competition data. The longer one below has more in it (including wet season data, which I will not be looking at because the sample sizes are so small) and is messier. The organization of this one is as follows: 
+1. Data entry
+2. Subsetting data
+3. By rank in MM groups, all males: Absolute Testes Mass
+4. By rank in MM groups, all males: Relative Testes Mass
+5. By group composition, all males: Absolute Testes Mass
+6. By group composition, all males: Relative Testes Mass
+7. By rank in MM groups, averages: Absolute Testes Mass
+8. By rank in MM groups, averages: Relative Testes Mass
+9. By group composition, averages: Absolute Testes Mass
+10. By group composition, averages: Relative Testes Mass
+
+Add section for loading libraries, only use CSVs, change names from dry/wet to mating/birthing
+
+
+Data Notes
+* Micka 2008 is intermediate in a SM group: he was transitioning, he was stained by August. He's the NA
+* Omby 2007a is excluded until we can get pictures 
+* 2006 Quincy has been edited to be clean
+* 2018 Zoma is excluded, as he's an adult natal male 
+
+1a. Load packages
+```{r}
+library(mosaic)
+library(radiant)
+library(lme4)
+library(lmerTest) #Shows p-values on mixed models 
+```
+1b. Enter the data for all testes measurements
+```{r}
+library(readxl)
+TestesComparisons <- read_excel("~/Google Drive/Projects/Body Dimorphism/TestesComparisons.xlsx")
+```
+
+1c. Enter the data for testes averages
+* Note: For this, I average the testes size (and weight) for each individual male when he was measured more than once in a group/dominance class, so that I could run t-tests. So for example Quincy is measured twice as a subordinate male in a multi-male group, and I averaged his relative and total testes mass for those two times. I have also excluded all wet season data from this dataset. This data is subset in 5b
+```{r}
+library(readxl)
+TestesAverages <- read_excel("~/Google Drive/Projects/Body Dimorphism/TestesAverages.xlsx")
+```
+
+2a. Subset the data by season **#change name to breeding vs wet season**
+```{r}
+# Separate dry from wet season
+DrySeasTestes <- TestesComparisons[TestesComparisons$CaptureSeason != "2007a", ]
+WetSeasTestes <- TestesComparisons[TestesComparisons$CaptureSeason == "2007a", ]
+```
+
+2b. Subset the Dry Season data by male group membership
+```{r}
+DrySMMales <- DrySeasTestes[DrySeasTestes$GroupComp == "SM", ]
+DryMMMales <- DrySeasTestes[DrySeasTestes$GroupComp == "MM", ]
+DryMMDom <- DryMMMales[DryMMMales$ChestStain == "Stained", ]
+DryMMSubsCI <- DryMMMales[DryMMMales$ChestStain != "Stained", ]
+DryMMClean <- DryMMMales[DryMMMales$ChestStain == "Clean", ]
+DryMMInter <- DryMMMales[DryMMMales$ChestStain == "Intermediate", ]
+DryAllDom <- DrySeasTestes[DrySeasTestes$ChestStain == "Stained", ]
+```
+
+2c. Subset data by presence of groupmates (paired sets)
+```{r}
+PairedAllSeas <- TestesComparisons[TestesComparisons$GroupMates == "Y", ]
+PairedDry <- DrySeasTestes[DrySeasTestes$GroupMates == "Y", ]
+```
+
+2d. Subset averaged data by male group membership and dominance
+```{r}
+AveragedAllDom <- TestesAverages[TestesAverages$ChestStain == "Stained", ]
+AveragedMMMales <- TestesAverages[TestesAverages$GroupComp == "MM", ]
+AveragedSMMales <- TestesAverages[TestesAverages$GroupComp == "SM", ]
+```
+
+## 3. By rank in MM groups, all males: Absolute Testes Mass
+
+3a. Total Testes Mass by Rank in MM groups (Dry) -- Mann-Whitney test
+```{r}
+group_by(DryMMMales, Rank) %>%
+  summarise(
+    median = median(TotalTestesMass, na.rm = TRUE),
+    mean = mean(TotalTestesMass, na.rm = TRUE),
+    IQR = IQR(TotalTestesMass, na.rm = TRUE),
+    sd = sd(TotalTestesMass, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(TotalTestesMass ~ Rank, data = DryMMMales)
+```
+
+3b. Plot for Total Testes Size by Rank in MM groups
+```{r}
+ggplot(data = DryMMMales, aes(x = Rank, y = TotalTestesMass)) + geom_point()
+```
+
+3c. Regression like a t-test -- same results as a t-test
+```{r}
+modMMTotal <- lm(TotalTestesMass ~ Rank, data = DryMMMales)
+#modMMTotal #RankSub is the slope 
+summary(modMMTotal)
+```
+
+3d. Linear mixed model like a t-test + repeated measures
+```{r}
+library(lme4)
+```
+```{r}
+lmmodMMTotal <- lmer(TotalTestesMass ~ Rank + (1|LemurID), data = DryMMMales)
+summary(lmmodMMTotal)
+```
+
+
+## 4. By rank in MM groups, all males: Relative Testes Mass
+
+4a. Relative Testes Mass by Rank in MM groups (Dry): Mann-Whitney Test
+```{r}
+group_by(DryMMMales, Rank) %>%
+  summarise(
+    median = median(RelativeTestesMass, na.rm = TRUE),
+    mean = mean(RelativeTestesMass, na.rm = TRUE),
+    IQR = IQR(RelativeTestesMass, na.rm = TRUE),
+    sd = sd(RelativeTestesMass, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(RelativeTestesMass ~ Rank, data = DryMMMales)
+```
+
+4b. Plot for Relative Testes Size by Rank in MM groups
+```{r}
+ggplot(data = DryMMMales, aes(x = Rank, y = RelativeTestesMass)) + geom_point()
+```
+
+4c. Linear mixed model like a t-test + repeated measures
+```{r}
+lmmodMMRelative <- lmer(RelativeTestesMass ~ Rank + (1|LemurID), data = DryMMMales)
+summary(lmmodMMRelative)
+```
+
+4d. Weight by Rank in MM groups (Dry): Mann-Whitney
+A: Not significant
+```{r}
+group_by(DryMMMales, Rank) %>%
+  summarise(
+    median = median(Weight, na.rm = TRUE),
+    mean = mean(Weight, na.rm = TRUE),
+    IQR = IQR(Weight, na.rm = TRUE),
+    sd = sd(Weight, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(Weight ~ Rank, data = DryMMMales)
+```
+
+4e. Weight by Rank in MM Groups (Dry): lmer
+```{r}
+lmmodMMWeights <- lmer(Weight ~ Rank + (1|LemurID), data = DryMMMales)
+summary(lmmodMMWeights)
+```
+
+## 5. By group composition, all males: Absolute Testes Mass
+
+5a. Absolute Testes Mass Comparing SM Dominants and MM Dominants (Dry): Mann-Whitney and T-Test
+```{r}
+group_by(DryAllDom, GroupComp) %>%
+  summarise(
+    median = median(TotalTestesMass, na.rm = TRUE),
+    mean = mean(TotalTestesMass, na.rm = TRUE),
+    IQR = IQR(TotalTestesMass, na.rm = TRUE),
+    sd = sd(TotalTestesMass, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(TotalTestesMass ~ GroupComp, data = DryAllDom)
+t.test(TotalTestesMass~GroupComp, data = DryAllDom)
+```
+
+5b. Plot for Absolute Testes Size by Group Composition, Dominant Males
+```{r}
+ggplot(data = DryAllDom, aes(x = GroupComp, y = TotalTestesMass)) + geom_point()
+```
+
+5c. Linear mixed effects model like a t-test + repeated measures
+```{r}
+lmmodDomsTotal <- lmer(TotalTestesMass ~ GroupComp + (1|LemurID), data = DryAllDom)
+summary(lmmodDomsTotal)
+```
+
+##Look
+5d. LMM including body mass 
+A: This means that when I control for weight, dom males in single male groups have smaller testes by 0.43
+```{r}
+allDomWeightFixedMod <- lmer(TotalTestesMass ~ GroupComp + Weight + (1|LemurID), data = DryAllDom)
+summary(allDomWeightFixedMod)
+```
+
+
+## 6. By group composition, all males: Relative Testes Mass
+
+6a. Relative Testes Mass Comparing SM Dominants and MM Dominants (Dry): Mann-Whitney and T-Test
+```{r}
+group_by(DryAllDom, GroupComp) %>%
+  summarise(
+    median = median(RelativeTestesMass, na.rm = TRUE),
+    mean = mean(RelativeTestesMass, na.rm = TRUE),
+    IQR = IQR(RelativeTestesMass, na.rm = TRUE),
+    sd = sd(RelativeTestesMass, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(RelativeTestesMass ~ GroupComp, data = DryAllDom)
+t.test(RelativeTestesMass~GroupComp, data = DryAllDom)
+```
+
+6b. Plot for Relative Testes Size by Group Composition, Dominant Males
+```{r}
+ggplot(data = DryAllDom, aes(x = GroupComp, y = RelativeTestesMass)) + geom_point()
+```
+
+6c. Linear mixed effects model like a t-test + repeated measures
+```{r}
+lmmodDomsRelative <- lmer(RelativeTestesMass ~ GroupComp + (1|LemurID), data = DryAllDom)
+summary(lmmodDomsRelative)
+```
+
+6d. Weight by Group Composition, Dominant Males (Dry): Mann-Whitney
+A: Not significant
+```{r}
+group_by(DryAllDom, GroupComp) %>%
+  summarise(
+    median = median(Weight, na.rm = TRUE),
+    mean = mean(Weight, na.rm = TRUE),
+    IQR = IQR(Weight, na.rm = TRUE),
+    sd = sd(Weight, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(Weight ~ GroupComp, data = DryAllDom)
+```
+
+6e. Weight by Group Composition, Dominant Males: lmer
+```{r}
+lmmodDomsWeights <- lmer(Weight ~ GroupComp + (1|LemurID), data = DryAllDom)
+summary(lmmodDomsWeights)
+```
+
+## 7. By rank in MM groups, averages: Absolute Testes Mass
+
+7a. Looking at Male Averages: Total Testes Mass by Rank in MM groups: t-test
+```{r}
+group_by(AveragedMMMales, Rank) %>%
+  summarise(
+    median = median(AvgTotalTestes, na.rm = TRUE),
+    mean = mean(AvgTotalTestes, na.rm = TRUE),
+    IQR = IQR(AvgTotalTestes, na.rm = TRUE)
+  )
+```
+Checking normality: all normal!
+```{r}
+shapiro.test(AveragedMMMales$AvgTotalTestes)
+var.test(AvgTotalTestes ~ Rank, data = AveragedMMMales) #F-test
+```
+```{r}
+t.test(AvgTotalTestes ~ Rank, data = AveragedMMMales)
+```
+
+## 8. By rank in MM groups, averages: Relative Testes Mass
+
+8a. Looking at Male Averages: Relative Testes Mass by Rank in MM groups
+```{r}
+group_by(AveragedMMMales, Rank) %>%
+  summarise(
+    median = median(AvgRelativeTestes, na.rm = TRUE),
+    mean = mean(AvgRelativeTestes, na.rm = TRUE),
+    IQR = IQR(AvgRelativeTestes, na.rm = TRUE)
+  )
+```
+Checking normality: all normal!
+```{r}
+shapiro.test(AveragedMMMales$AvgRelativeTestes)
+var.test(AvgRelativeTestes ~ Rank, data = AveragedMMMales) #F-test
+```
+```{r}
+t.test(AvgRelativeTestes ~ Rank, data = AveragedMMMales)
+```
+
+## 9. By group composition, averages: Absolute Testes Mass
+
+9a. Looking at Male Averages: Total Testes Mass by Group Composition, Just Dominants
+```{r}
+group_by(AveragedAllDom, GroupComp) %>%
+  summarise(
+    median = median(AvgTotalTestes, na.rm = TRUE),
+    mean = mean(AvgTotalTestes, na.rm = TRUE),
+    IQR = IQR(AvgTotalTestes, na.rm = TRUE)
+  )
+```
+Checking normality: all normal!
+```{r}
+shapiro.test(AveragedAllDom$AvgTotalTestes)
+var.test(AvgTotalTestes ~ GroupComp, data = AveragedAllDom) #F-test
+```
+```{r}
+t.test(AvgTotalTestes ~ GroupComp, data = AveragedAllDom)
+```
+
+
+## 10. By group composition, averages: Relative Testes Mass
+
+10a. Looking at Male Averages: Relative Testes Mass by Group Composition, Just Dominants
+```{r}
+group_by(AveragedAllDom, GroupComp) %>%
+  summarise(
+    median = median(AvgRelativeTestes, na.rm = TRUE),
+    mean = mean(AvgRelativeTestes, na.rm = TRUE),
+    IQR = IQR(AvgRelativeTestes, na.rm = TRUE)
+  )
+```
+Checking normality: all normal!
+```{r}
+shapiro.test(AveragedAllDom$AvgRelativeTestes)
+var.test(AvgRelativeTestes ~ GroupComp, data = AveragedAllDom) #F-test
+```
+```{r}
+t.test(AvgRelativeTestes ~ GroupComp, data = AveragedAllDom)
+```
+
+
+## 11. Other things we worked on
+
+11a. Linear mixed model with multi-male and single-male data
+```{r}
+lmmAllDryAllRanks <- lmer(TotalTestesMass ~ Rank + GroupComp + (1|LemurID), data=DrySeasTestes)
+summary(lmmAllDryAllRanks)
+```
+
+11b. Linear mixed model with multi-male and single-male data, with an interaction by rank
+```{r}
+lmmAllDryRankInter <- lmer(TotalTestesMass ~ Rank * GroupComp + (1|LemurID), data=DrySeasTestes)
+summary(lmmAllDryRankInter)
+```
+
+
+11c. Plot for paired males
+```{r}
+ggplot(data = PairedDry, aes(x = Rank, y = TotalTestesMass, color = CaptureSeason, group = CaptureSeason)) + geom_point() + geom_line()
+```
+
+12a. Testes size predicted by body mass -- All, absolute
+```{r, fig.show="hold", out.width="50%"}
+testesByMassAllPlot1 <- ggplot(data = DrySeasTestes, aes(x = Weight, y = TotalTestesMass, color = LemurID)) + geom_point()
+#testesByMassAllPlot1
+
+testesbyMassAllPlot2 <- ggplot(data = DryMMMales, aes(x = Weight, y = TotalTestesMass, color = LemurID)) + geom_point()
+testesbyMassAllPlot2
+testesbyMassAllPlot3 <- ggplot(data = DrySMMales, aes(x = Weight, y = TotalTestesMass, color = LemurID)) + geom_point()
+testesbyMassAllPlot3
+```
+
+12b. Testes size by body mass -- averages
+
+
+13. Testes size by age absolute
+```{r}
+ggplot(data = DrySeasTestes, aes(x = Age, y = RelativeTestesMass, color = LemurID)) + geom_point()
+```
+
+
+
+***
+
+
+
+# Sperm Competition: Everything
+
+Organization Notes
+* Numbering is a bit off, it was too much work to go back and renumber each time I added something. I'll fix it at the end. 
+
+Data Notes
+* Micka 2008 is intermediate in a SM group: he was transitioning, he was stained by August. He's the NA
+* Omby 2007a is excluded until we can get pictures 
+* 2006 Quincy has been edited to be clean
+* 2018 Zoma is excluded, as he's an adult natal male 
+
+1. Enter the data for all testes measurements
+```{r}
+library(readxl)
+TestesComparisons <- read_excel("~/Google Drive/Projects/Body Dimorphism/TestesComparisons.xlsx")
+```
+
+1b. Enter the data for testes averages
+* Note: For this, I average the testes size for each individual male when he was measured more than once in a group/dominance class, so that I could run t-tests. So for example Quincy is measured twice as a subordinate male in a multi-male group, and I averaged his relative and total testes mass for those two times. I have also excluded all wet season data from this dataset. This data is subset in 5b
+```{r}
+library(readxl)
+TestesAverages <- read_excel("~/Google Drive/Projects/Body Dimorphism/TestesAverages.xlsx")
+```
+2. Subset the data by season
+```{r}
+# Separate dry from wet season
+DrySeasTestes <- TestesComparisons[TestesComparisons$CaptureSeason != "2007a", ]
+WetSeasTestes <- TestesComparisons[TestesComparisons$CaptureSeason == "2007a", ]
+```
+
+3. Subset the Dry Season data by male group membership
+```{r}
+DrySMMales <- DrySeasTestes[DrySeasTestes$GroupComp == "SM", ]
+DryMMMales <- DrySeasTestes[DrySeasTestes$GroupComp == "MM", ]
+DryMMDom <- DryMMMales[DryMMMales$ChestStain == "Stained", ]
+DryMMSubsCI <- DryMMMales[DryMMMales$ChestStain != "Stained", ]
+DryMMClean <- DryMMMales[DryMMMales$ChestStain == "Clean", ]
+DryMMInter <- DryMMMales[DryMMMales$ChestStain == "Intermediate", ]
+DryAllDom <- DrySeasTestes[DrySeasTestes$ChestStain == "Stained", ]
+```
+
+4. Subset the Wet Season (January 2007) data
+```{r}
+JanSM <- WetSeasTestes[WetSeasTestes$GroupComp == "SM", ]
+JanMM <- WetSeasTestes[WetSeasTestes$GroupComp == "MM", ]
+JanMMDom <- JanMM[JanMM$ChestStain == "Stained", ]
+JanMMSub <- JanMM[JanMM$ChestStain == "Clean", ]
+JanAllDom <- WetSeasTestes[WetSeasTestes$ChestStain == "Stained", ]
+```
+
+5. Subset all data by group membership, in case I want to include January 2007
+```{r}
+AllSeasSM <- TestesComparisons[TestesComparisons$GroupComp == "SM", ]
+AllSeasMM <- TestesComparisons[TestesComparisons$GroupComp == "MM", ]
+AllSeasMMDom <- AllSeasMM[AllSeasMM$ChestStain == "Stained", ]
+AllSeasMMSubsCI <- AllSeasMM[AllSeasMM$ChestStain != "Stained", ]
+AllSeasMMClean <- AllSeasMM[AllSeasMM$ChestStain == "Clean", ]
+AllSeasMMInter <- AllSeasMM[AllSeasMM$ChestStain == "Intermediate", ]
+AllSeasAllDom <- TestesComparisons[TestesComparisons$ChestStain == "Stained", ]
+```
+
+5a. Subset data by presence of groupmates (paired sets)
+```{r}
+PairedAllSeas <- TestesComparisons[TestesComparisons$GroupMates == "Y", ]
+PairedDry <- DrySeasTestes[DrySeasTestes$GroupMates == "Y", ]
+PairedWet <- WetSeasTestes[WetSeasTestes$GroupMates == "Y", ]
+```
+
+5b. Subset averaged data by male group membership and dominance
+```{r}
+AveragedAllDom <- TestesAverages[TestesAverages$ChestStain == "Stained", ]
+AveragedMMMales <- TestesAverages[TestesAverages$GroupComp == "MM", ]
+AveragedSMMales <- TestesAverages[TestesAverages$GroupComp == "SM", ]
+```
+
+5c. Plot for paired males
+```{r}
+ggplot(data = PairedDry, aes(x = Rank, y = TotalTestesMass, color = CaptureSeason, group = CaptureSeason)) + geom_point() + geom_line()
+```
+
+6. Total Testes Mass by Rank in MM groups (Dry)
+```{r}
+group_by(DryMMMales, Rank) %>%
+  summarise(
+    median = median(TotalTestesMass, na.rm = TRUE),
+    mean = mean(TotalTestesMass, na.rm = TRUE),
+    IQR = IQR(TotalTestesMass, na.rm = TRUE),
+    sd = sd(TotalTestesMass, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(TotalTestesMass ~ Rank, data = DryMMMales)
+```
+
+6b. Plot for Total Testes Size by Rank in MM groups
+```{r}
+ggplot(data = DryMMMales, aes(x = Rank, y = TotalTestesMass)) + geom_point()
+```
+
+6c. Regression like a t-test -- same results as a t-test
+```{r}
+modMMTotal <- lm(TotalTestesMass ~ Rank, data = DryMMMales)
+#modMMTotal #RankSub is the slope 
+summary(modMMTotal)
+```
+
+6d. Linear mixed model like a t-test + repeated measures
+```{r}
+library(lme4)
+```
+```{r}
+lmmodMMTotal <- lmer(TotalTestesMass ~ Rank + (1|LemurID), data = DryMMMales)
+summary(lmmodMMTotal)
+```
+
+6e. Linear mixed model with multi-male and single-male data
+```{r}
+lmmAllDryAllRanks <- lmer(TotalTestesMass ~ Rank + GroupComp + (1|LemurID), data=DrySeasTestes)
+summary(lmmAllDryAllRanks)
+```
+
+6f. Linear mixed model with multi-male and single-male data, with an interaction by rank
+```{r}
+lmmAllDryRankInter <- lmer(TotalTestesMass ~ Rank * GroupComp + (1|LemurID), data=DrySeasTestes)
+summary(lmmAllDryRankInter)
+```
+
+7. Relative Testes Mass by Rank in MM groups (Dry)
+```{r}
+group_by(DryMMMales, Rank) %>%
+  summarise(
+    median = median(RelativeTestesMass, na.rm = TRUE),
+    mean = mean(RelativeTestesMass, na.rm = TRUE),
+    IQR = IQR(RelativeTestesMass, na.rm = TRUE),
+    sd = sd(RelativeTestesMass, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(RelativeTestesMass ~ Rank, data = DryMMMales)
+```
+
+7b. Weight by Rank in MM groups (Dry)
+A: Not significant
+```{r}
+group_by(DryMMMales, Rank) %>%
+  summarise(
+    median = median(Weight, na.rm = TRUE),
+    mean = mean(Weight, na.rm = TRUE),
+    IQR = IQR(Weight, na.rm = TRUE),
+    sd = sd(Weight, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(Weight ~ Rank, data = DryMMMales)
+```
+
+8. Total Testes Mass for MM groups including January 2007 data
+```{r}
+group_by(AllSeasMM, Rank) %>%
+  summarise(
+    median = median(TotalTestesMass, na.rm = TRUE),
+    mean = mean(TotalTestesMass, na.rm = TRUE),
+    IQR = IQR(TotalTestesMass, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(TotalTestesMass ~ Rank, data = AllSeasMM)
+```
+9. Relative Testes Mass for MM groups including January 2007 data
+```{r}
+group_by(AllSeasMM, Rank) %>%
+  summarise(
+    median = median(RelativeTestesMass, na.rm = TRUE),
+    mean = mean(RelativeTestesMass, na.rm = TRUE),
+    IQR = IQR(RelativeTestesMass, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(RelativeTestesMass ~ Rank, data = AllSeasMM)
+```
+
+10. Absolute Testes Mass Comparing SM Dominants and MM Dominants (Dry)
+```{r}
+group_by(DryAllDom, GroupComp) %>%
+  summarise(
+    median = median(TotalTestesMass, na.rm = TRUE),
+    mean = mean(TotalTestesMass, na.rm = TRUE),
+    IQR = IQR(TotalTestesMass, na.rm = TRUE),
+    sd = sd(TotalTestesMass, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(TotalTestesMass ~ GroupComp, data = DryAllDom)
+t.test(TotalTestesMass~GroupComp, data = DryAllDom)
+```
+
+11. Relative Testes Mass Comparing SM Dominants and MM Dominants (Dry)
+```{r}
+group_by(DryAllDom, GroupComp) %>%
+  summarise(
+    median = median(RelativeTestesMass, na.rm = TRUE),
+    mean = mean(RelativeTestesMass, na.rm = TRUE),
+    IQR = IQR(RelativeTestesMass, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(RelativeTestesMass ~ GroupComp, data = DryAllDom)
+```
+11a. Weight Comparing SM Dominants and MM Dominants (Dry)
+```{r}
+group_by(DryAllDom, GroupComp) %>%
+  summarise(
+    median = median(Weight, na.rm = TRUE),
+    mean = mean(Weight, na.rm = TRUE),
+    IQR = IQR(Weight, na.rm = TRUE),
+    sd = sd(Weight, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(Weight ~ GroupComp, data = DryAllDom)
+```
+
+12. Total Testes Mass Comparing SM Dominants and MM Dominants (All)
+```{r}
+group_by(AllSeasAllDom, GroupComp) %>%
+  summarise(
+    median = median(TotalTestesMass, na.rm = TRUE),
+    mean = mean(TotalTestesMass, na.rm = TRUE),
+    IQR = IQR(TotalTestesMass, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(TotalTestesMass ~ GroupComp, data = AllSeasAllDom)
+```
+
+13. Relative Testes Mass Comparing SM Dominants and MM Dominants (All)
+```{r}
+group_by(AllSeasAllDom, GroupComp) %>%
+  summarise(
+    median = median(RelativeTestesMass, na.rm = TRUE),
+    mean = mean(RelativeTestesMass, na.rm = TRUE),
+    IQR = IQR(RelativeTestesMass, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(RelativeTestesMass ~ GroupComp, data = AllSeasAllDom)
+```
+
+14. Total Testes Mass Comparing Doms and Subs in Paired Groups (Dry Seasons)
+A: T-test is significant, wilcox isn't
+```{r}
+group_by(PairedDry, Rank) %>%
+  summarise(
+    median = median(TotalTestesMass, na.rm = TRUE),
+    mean = mean(TotalTestesMass, na.rm = TRUE),
+    IQR = IQR(TotalTestesMass, na.rm = TRUE)
+  )
+```
+Checking normality: all normal!
+```{r}
+shapiro.test(PairedDry$TotalTestesMass)
+var.test(TotalTestesMass ~ Rank, data = PairedDry) #F-test
+```
+```{r}
+wilcox.test(TotalTestesMass ~ Rank, data = PairedDry)
+t.test(TotalTestesMass ~ Rank, data = PairedDry, var.equal = TRUE)
+```
+##Look
+14c. Paired graph by indiv, absolute
+```{r}
+ggplot(data = PairedDry, aes(x = Rank, y = TotalTestesMass, color = LemurID, group = LemurID)) + geom_point() + geom_line()
+```
+14d. Paired graph by indiv, relative
+```{r}
+ggplot(data = PairedDry, aes(x = Rank, y = RelativeTestesMass, color = LemurID, group = LemurID)) + geom_point() + geom_line()
+```
+
+15. Relative Testes Mass Comparing Doms and Subs in Paired Groups (Dry Seasons)
+A: Not significant (with Zoma, Wilcox is significant, but t-test isn't)
+```{r}
+group_by(PairedDry, Rank) %>%
+  summarise(
+    median = median(RelativeTestesMass, na.rm = TRUE),
+    mean = mean(RelativeTestesMass, na.rm = TRUE),
+    IQR = IQR(RelativeTestesMass, na.rm = TRUE)
+  )
+```
+Checking normality: all normal!
+```{r}
+shapiro.test(PairedDry$RelativeTestesMass)
+var.test(RelativeTestesMass ~ Rank, data = PairedDry) #F-test
+```
+```{r}
+wilcox.test(RelativeTestesMass ~ Rank, data = PairedDry)
+t.test(RelativeTestesMass ~ Rank, data = PairedDry, var.equal = TRUE)
+```
+16. All MM males compared to all SM males: Absolute Testes Mass
+A: Not significant
+```{r}
+group_by(DrySeasTestes, GroupComp) %>%
+  summarise(
+    median = median(TotalTestesMass, na.rm = TRUE),
+    mean = mean(TotalTestesMass, na.rm = TRUE),
+    IQR = IQR(TotalTestesMass, na.rm = TRUE),
+    SD = sd(TotalTestesMass, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(TotalTestesMass ~ GroupComp, data = DrySeasTestes)
+```
+
+17. All MM males compared to all SM males: Relative Testes Mass
+A: Not significant
+```{r}
+group_by(DrySeasTestes, GroupComp) %>%
+  summarise(
+    median = median(RelativeTestesMass, na.rm = TRUE),
+    mean = mean(RelativeTestesMass, na.rm = TRUE),
+    IQR = IQR(RelativeTestesMass, na.rm = TRUE),
+    SD = sd(RelativeTestesMass, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(RelativeTestesMass ~ GroupComp, data = DrySeasTestes)
+```
+
+18. All MM males compared to all SM males: Weight
+```{r}
+group_by(DrySeasTestes, GroupComp) %>%
+  summarise(
+    median = median(Weight, na.rm = TRUE),
+    mean = mean(Weight, na.rm = TRUE),
+    IQR = IQR(Weight, na.rm = TRUE),
+    SD = sd(Weight, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(Weight ~ GroupComp, data = DrySeasTestes)
+```
+
+19. Looking at Male Averages: Total Testes Mass by Rank in MM groups
+```{r}
+group_by(AveragedMMMales, Rank) %>%
+  summarise(
+    median = median(AvgTotalTestes, na.rm = TRUE),
+    mean = mean(AvgTotalTestes, na.rm = TRUE),
+    IQR = IQR(AvgTotalTestes, na.rm = TRUE)
+  )
+```
+Checking normality: all normal!
+```{r}
+shapiro.test(AveragedMMMales$AvgTotalTestes)
+var.test(AvgTotalTestes ~ Rank, data = AveragedMMMales) #F-test
+```
+```{r}
+t.test(AvgTotalTestes ~ Rank, data = AveragedMMMales)
+```
+19a. Looking at Male Averages: Relative Testes Mass by Rank in MM groups
+```{r}
+group_by(AveragedMMMales, Rank) %>%
+  summarise(
+    median = median(AvgRelativeTestes, na.rm = TRUE),
+    mean = mean(AvgRelativeTestes, na.rm = TRUE),
+    IQR = IQR(AvgRelativeTestes, na.rm = TRUE)
+  )
+```
+Checking normality: all normal!
+```{r}
+shapiro.test(AveragedMMMales$AvgRelativeTestes)
+var.test(AvgRelativeTestes ~ Rank, data = AveragedMMMales) #F-test
+```
+```{r}
+t.test(AvgRelativeTestes ~ Rank, data = AveragedMMMales)
+```
+19c. Looking at Male Averages: Total Testes Mass by Group Composition, Just Dominants
+```{r}
+group_by(AveragedAllDom, GroupComp) %>%
+  summarise(
+    median = median(AvgTotalTestes, na.rm = TRUE),
+    mean = mean(AvgTotalTestes, na.rm = TRUE),
+    IQR = IQR(AvgTotalTestes, na.rm = TRUE)
+  )
+```
+Checking normality: all normal!
+```{r}
+shapiro.test(AveragedAllDom$AvgTotalTestes)
+var.test(AvgTotalTestes ~ GroupComp, data = AveragedAllDom) #F-test
+```
+```{r}
+t.test(AvgTotalTestes ~ GroupComp, data = AveragedAllDom)
+```
+
+19d. Looking at Male Averages: Relative Testes Mass by Group Composition, Just Dominants
+```{r}
+group_by(AveragedAllDom, GroupComp) %>%
+  summarise(
+    median = median(AvgRelativeTestes, na.rm = TRUE),
+    mean = mean(AvgRelativeTestes, na.rm = TRUE),
+    IQR = IQR(AvgRelativeTestes, na.rm = TRUE)
+  )
+```
+Checking normality: all normal!
+```{r}
+shapiro.test(AveragedAllDom$AvgRelativeTestes)
+var.test(AvgRelativeTestes ~ GroupComp, data = AveragedAllDom) #F-test
+```
+```{r}
+t.test(AvgRelativeTestes ~ GroupComp, data = AveragedAllDom)
+```
+
+
+
+
+
+
+
+
+
+
+***
+Adding females
+```{r}
+library(readxl)
+WeightComparisons326 <- read_excel("~/Google Drive/Projects/Body Dimorphism/WeightComparisons326.xlsx")
+```
+
+Subsetting
+```{r}
+FemAndMM <- WeightComparisons326[with(WeightComparisons326, Sex == "F" | GroupComp == "MM"), ]
+FemAndSM <- WeightComparisons326[with(WeightComparisons326, Sex == "F" | GroupComp == "SM"), ]
+```
+
+Females and MM
+```{r}
+group_by(FemAndMM, Sex) %>%
+  summarise(
+    median = median(Weight, na.rm = TRUE),
+    mean = mean(Weight, na.rm = TRUE),
+    IQR = IQR(Weight, na.rm = TRUE),
+    SD = sd(Weight, na.rm = TRUE)
+  )
+```
+```{r}
+wilcox.test(Weight ~ Sex, data = FemAndMM)
+```
+
+

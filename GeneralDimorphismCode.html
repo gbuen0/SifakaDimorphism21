@@ -414,8 +414,8 @@ summary {
 </div>
 
 
-<div id="weight" class="section level1">
-<h1>Weight</h1>
+<div id="weight-and-nested-anovas" class="section level1">
+<h1>Weight and Nested ANOVAs</h1>
 <p>Boxplot</p>
 <pre><code>library(ggplot2)
 ggplot(BodyMassData, aes(x=Age, y=Weight, fill=Sex)) + geom_boxplot()</code></pre>
@@ -469,6 +469,31 @@ model.BodyMassData&lt;-aov(Weight~Age+Sex%in%Age,data=BodyMassData)</code></pre>
 <p>Decide on variance in two ways: 1. Look at the boxplot, see if they have similar variations in weight (F seems more) 2. Compare the actual variances–see below</p>
 <pre><code>var(Weight[Sex==&quot;F&quot;])
 var(Weight[Sex==&quot;M&quot;])</code></pre>
+</div>
+<div id="looking-at-weight-of-all-malesline-chart" class="section level1">
+<h1>Looking at weight of all males–line chart</h1>
+<pre><code>ggplot(AdultMales, aes(x=CaptureDate, y=Weight, color=LemurID)) +geom_line()</code></pre>
+</div>
+<div id="leg-length" class="section level1">
+<h1>Leg Length</h1>
+<p>I’ve uploaded <code>LegLengthAdultAvg</code>.</p>
+<p>Let’s subset it into male and female leg length averages</p>
+<pre><code>FLeg &lt;- LegLengthAdultAvg[LegLengthAdultAvg$Sex == &quot;F&quot;, ]
+MLeg &lt;- LegLengthAdultAvg[LegLengthAdultAvg$Sex == &quot;M&quot;, ]</code></pre>
+<p>First, I’m running a Shapiro test to test normality</p>
+<pre><code>shapiro.test(MLeg$AvgLegLength)
+
+    Shapiro-Wilk normality test
+
+data:  MLeg$AvgLegLength
+W = 0.96085, p-value = 0.3256
+#######
+shapiro.test(FLeg$AvgLegLength)
+
+    Shapiro-Wilk normality test
+
+data:  FLeg$AvgLegLength
+W = 0.89398, p-value = 0.06441</code></pre>
 </div>
 
 

@@ -29,23 +29,35 @@ testes(15.5, 10.8)
 # So here's trying with her formula
 
 
-TestesVolume <- function(Length, Width){
-  LHalf <- Length/2
-  WHalfSq <- (Width/2)^2
-  Combo <- LHalf * WHalfSq * pi * (4/3)
+LTestesVolume <- function(LTesticleLength, LTesticleWidth){
+  LLHalf <- LTesticleLength/2
+  LWHalfSq <- (LTesticleWidth/2)^2
+  Combo <- LLHalf * LWHalfSq * pi * (4/3)
   Numerator <- Combo * 1.1
-  Volume <- Numerator/1000
-  return(Volume)
+  LVolume <- Numerator/1000
+  return(LVolume)
 }
 #Test
 TestesVolume(12,5.2)
 #It worked!
 
+RTestesVolume <- function(RTesticleLength, RTesticleWidth){
+  RLHalf <- RTesticleLength/2
+  RWHalfSq <- (RTesticleWidth/2)^2
+  Combo <- RLHalf * RWHalfSq * pi * (4/3)
+  Numerator <- Combo * 1.1
+  RVolume <- Numerator/1000
+  return(RVolume)
+}
 
 
 
 
 
+
+for(i in 1:32){
+  
+}
 
 
 

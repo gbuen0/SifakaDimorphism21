@@ -1,0 +1,149 @@
+---
+title: "StatsQuestions"
+output: html_document
+---
+
+
+
+# Sperm Competition
+
+1. Is the W of a wilcoxon rank sum exact test the same as the U of a Mann-Whitney? 
+
+1. Load packages
+```{r}
+library(mosaic)
+library(lme4)
+library(lmerTest)
+library(readxl)
+```
+2. Read in data (sorry, tried to do this with git but couldn't get it to work)
+```{r}
+TestesDrySeason <- read_excel("~/Google Drive/Projects/Body Dimorphism/TestesDrySeason.xlsx")
+TestesAverages <- read_excel("~/Google Drive/Projects/Body Dimorphism/TestesAverages.xlsx")
+```
+
+3a. Subset Dry Season Data
+```{r}
+DrySMMales <- TestesDrySeason[TestesDrySeason$GroupComp == "SM", ]
+DryMMMales <- TestesDrySeason[TestesDrySeason$GroupComp == "MM", ]
+DryAllDom <- TestesDrySeason[TestesDrySeason$ChestStain == "Stained", ]
+```
+
+3b. Subset Averaged Data
+```{r}
+AveragedAllDom <- TestesAverages[TestesAverages$ChestStain == "Stained", ]
+AveragedMMMales <- TestesAverages[TestesAverages$GroupComp == "MM", ]
+AveragedSMMales <- TestesAverages[TestesAverages$GroupComp == "SM", ]
+```
+
+
+4. Total Testes Mass by Rank in Multi-Male Groups
+4a. Visualize
+```{r}
+ggplot(data = DryMMMales, aes(x = Rank, y = TotalTestesMass)) + geom_point()
+```
+
+4b. Linear Mixed Effects Model
+```{r}
+lmmodMMTotal <- lmer(TotalTestesMass ~ Rank + (1|LemurID) + (1|Group), data = DryMMMales)
+summary(lmmodMMTotal)
+```
+
+```{r}
+lmmodMMGMTotal <- lmer(TotalTestesMass ~ Rank + (1|LemurID) + (1|GroupMateID), data = DryMMMales)
+summary(lmmodMMTotal)
+```
+
+
+
+5. Total Testes Mass Comparing SM Dominants and MM Dominants
+
+5a. Linear Mixed Effects Model
+```{r}
+lmmodDomsTotal <- lmer(TotalTestesMass ~ GroupComp + (1|LemurID), data = DryAllDom)
+summary(lmmodDomsTotal)
+```
+
+
+# Female Fecundity
+
+1. Import Data
+```{r}
+library(readxl)
+AllAdultFemales <- read_excel("~/Google Drive/Projects/Fecundity/AllAdultFemales.xlsx")
+```
+
+2. Subset Data to Just Adult Females 
+```{r}
+dummy <- AllAdultFemales[AllAdultFemales$CaptureSeason != "2007a", ]
+AdultFemales <- dummy[dummy$Age >= 5, ]
+belowAdult <- dummy[dummy$Age <= 4, ]
+```
+
+LMER try
+```{r}
+lmAFPregnant <- lmer(Weight ~ Pregnant + (1|LemurID) + (1|Age), data = AdultFemales)
+summary(lmAFPregnant)
+```
+
+Visualize
+```{r}
+group_by(AdultFemales, Pregnant) %>%
+  summarise(
+    median = median(Weight, na.rm = TRUE),
+    mean = mean(Weight, na.rm = TRUE),
+    IQR = IQR(Weight, na.rm = TRUE),
+    sd = sd(Weight, na.rm = TRUE)
+  )
+```
+
+```{r}
+tryYoung <- lm(Weight ~ Pregnant, data = belowAdult)
+summary(tryYoung)
+```
+
+
+
+Looking at tail-crown
+```{r}
+ggplot(data=AdultFemales, aes(x = CaptureSeason, y = TailCrown, color = LemurID, group = LemurID)) + geom_point() + geom_line()
+
+```
+
+
+
+
+# Leg Length
+
+Trying to figure out the best t-test. I ran the following and I'm not sure which is best. 
+
+
+2. This is what I used previously. In the past I put var.eq=F, but I tested the variance and they are equal, so which should I do? It seems like the second is Welch's but the first isn't? 
+```
+> t.test(AvgLegLength~Sex, mu=0, alt="two.sided", conf=0.95, var.eq=T, paired=F, data=LegLengthAdultAvg)
+
+	Two Sample t-test
+
+data:  AvgLegLength by Sex
+t = 4.4452, df = 44, p-value = 5.875e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.9512152 2.5291419
+sample estimates:
+mean in group F mean in group M 
+       33.92462        32.18444 
+
+> t.test(AvgLegLength~Sex, mu=0, alt="two.sided", conf=0.95, var.eq=F, paired=F, data=LegLengthAdultAvg)
+
+	Welch Two Sample t-test
+
+data:  AvgLegLength by Sex
+t = 4.1529, df = 25.489, p-value = 0.0003237
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.8780208 2.6023363
+sample estimates:
+mean in group F mean in group M 
+       33.92462        32.18444 
+```
+

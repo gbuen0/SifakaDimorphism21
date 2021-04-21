@@ -1,0 +1,337 @@
+---
+title: "DimorphismStatistics21"
+author: "Gabrielle Bueno"
+date: "4/11/2021"
+output: html_document
+---
+# Sperm Competition
+
+1. Load packages
+```{r}
+library(mosaic)
+library(radiant)
+library(lme4)
+library(lmerTest) #Shows p-values on mixed models 
+```
+
+2. Enter the data for all testes measurements
+```{r}
+library(readxl)
+TestesComparisons <- read_excel("~/Google Drive/Projects/Body Dimorphism/TestesComparisons.xlsx")
+```
+
+2a. Subset the data by season 
+```{r}
+# Separate dry from wet season
+DrySeasTestes <- TestesComparisons[TestesComparisons$CaptureSeason != "2007a", ]
+WetSeasTestes <- TestesComparisons[TestesComparisons$CaptureSeason == "2007a", ]
+```
+
+2b. Subset the Dry Season data by male group membership
+```{r}
+DrySMMales <- DrySeasTestes[DrySeasTestes$GroupComp == "SM", ]
+DryMMMales <- DrySeasTestes[DrySeasTestes$GroupComp == "MM", ]
+DryMMDom <- DryMMMales[DryMMMales$ChestStain == "Stained", ]
+DryMMSubsCI <- DryMMMales[DryMMMales$ChestStain != "Stained", ]
+DryMMClean <- DryMMMales[DryMMMales$ChestStain == "Clean", ]
+DryMMInter <- DryMMMales[DryMMMales$ChestStain == "Intermediate", ]
+DryAllDom <- DrySeasTestes[DrySeasTestes$ChestStain == "Stained", ]
+```
+
+2c. Subset data by presence of groupmates (paired sets)
+```{r}
+PairedAllSeas <- TestesComparisons[TestesComparisons$GroupMates == "Y", ]
+PairedDry <- DrySeasTestes[DrySeasTestes$GroupMates == "Y", ]
+```
+
+## 3. Rank: Total Testes Mass
+
+3a. Total Testes Mass by Rank in Multi-Male Groups: LMER
+```{r}
+lmmodMMTotal <- lmer(TotalTestesMass ~ Rank + (1|LemurID) + (1|Group), data = DryMMMales)
+summary(lmmodMMTotal)
+```
+
+3b: Total Testes Mass by Rank in Multi-Male Groups: Descriptive Statistics
+```{r}
+group_by(DryMMMales, Rank) %>%
+  summarise(
+    median = median(TotalTestesMass, na.rm = TRUE),
+    mean = mean(TotalTestesMass, na.rm = TRUE),
+    IQR = IQR(TotalTestesMass, na.rm = TRUE),
+    sd = sd(TotalTestesMass, na.rm = TRUE)
+  )
+```
+
+## 4.  Rank: Relative Testes Mass
+
+4. Relative Testes Mass by Rank in Multi-Male Groups: LMER
+```{r}
+lmmodMMRelative <- lmer(RelativeTestesMass ~ Rank + (1|LemurID) + (1|Group), data = DryMMMales)
+summary(lmmodMMRelative)
+```
+
+## 5. Rank: Weight
+
+5. Weight by Rank in Multi-Male Groups: LMER
+```{r}
+lmmodMMWeights <- lmer(Weight ~ Rank + (1|LemurID) + (1|Group), data = DryMMMales)
+summary(lmmodMMWeights)
+```
+
+5b. Weight by Rank in Multi-Male Groups: Descriptive Statistics
+```{r}
+group_by(DryMMMales, Rank) %>%
+  summarise(
+    median = median(Weight, na.rm = TRUE),
+    mean = mean(Weight, na.rm = TRUE),
+    IQR = IQR(Weight, na.rm = TRUE),
+    sd = sd(Weight, na.rm = TRUE)
+  )
+```
+
+## 6. Group Comp: Total Testes Mass
+
+6. Total Testes Mass by Group Composition (SM vs MM Dominants): LMER
+```{r}
+lmmodDomTotal <- lmer(TotalTestesMass ~ GroupComp + (1|LemurID), data = DryAllDom)
+summary(lmmodDomTotal)
+```
+
+## 7. Group Comp: Relative Testes Mass
+
+7. Relative Testes Mass by Group Composition (SM vs MM Dominants): LMER
+```{r}
+lmmodDomRelative <- lmer(RelativeTestesMass ~ GroupComp + (1|LemurID), data = DryAllDom)
+summary(lmmodDomRelative)
+```
+## 8. Group Comp: Weight
+
+8. Weight by Group Composition (SM vs MM Dominants): LMER
+```{r}
+lmmodDomWeights <- lmer(Weight ~ GroupComp + (1|LemurID), data = DryAllDom)
+summary(lmmodDomWeights)
+```
+
+8b. Weight by Group Composition (SM vs MM Dominants): Descriptive Statistics
+```{r}
+group_by(DryAllDom, GroupComp) %>%
+  summarise(
+    median = median(Weight, na.rm = TRUE),
+    mean = mean(Weight, na.rm = TRUE),
+    IQR = IQR(Weight, na.rm = TRUE),
+    sd = sd(Weight, na.rm = TRUE)
+  )
+```
+
+## 9. Averages Across Groups
+
+9. Looking at averages across groups: descriptive stats
+```{r}
+dryG2 <- DryMMMales[DryMMMales$Group == "II", ]
+dryG3 <- DryMMMales[DryMMMales$Group == "III", ]
+dryG4 <- DryMMMales[DryMMMales$Group == "IV", ]
+dryGUnmarked <- DryMMMales[DryMMMales$Group == "Unmarked", ] #only 1 male
+dryG6 <- DryMMMales[DryMMMales$Group == "VI", ] # only 1 male
+```
+9a. Group 2 (n = 7, nDom = 4, nSub = 3)
+```{r}
+group_by(dryG2, Rank) %>%
+  summarise(
+    median = median(TotalTestesMass, na.rm = TRUE),
+    mean = mean(TotalTestesMass, na.rm = TRUE),
+    IQR = IQR(TotalTestesMass, na.rm = TRUE),
+    sd = sd(TotalTestesMass, na.rm = TRUE)
+  )
+```
+9b. Group 3 (n = 7, nDom = 3, nSub = 4)
+```{r}
+group_by(dryG3, Rank) %>%
+  summarise(
+    median = median(TotalTestesMass, na.rm = TRUE),
+    mean = mean(TotalTestesMass, na.rm = TRUE),
+    IQR = IQR(TotalTestesMass, na.rm = TRUE),
+    sd = sd(TotalTestesMass, na.rm = TRUE)
+  )
+```
+9c. Group 4 (n = 6, nDom = 3, nSub = 3)
+```{r}
+group_by(dryG4, Rank) %>%
+  summarise(
+    median = median(TotalTestesMass, na.rm = TRUE),
+    mean = mean(TotalTestesMass, na.rm = TRUE),
+    IQR = IQR(TotalTestesMass, na.rm = TRUE),
+    sd = sd(TotalTestesMass, na.rm = TRUE)
+  )
+```
+9d. Group 6 (n = 1, nSub = 1)
+```{r}
+# Only Orion, Subordinate/Intermediate
+group_by(dryG6, Rank) %>%
+  summarise(
+    mean = mean(TotalTestesMass, na.rm = TRUE)
+  )
+```
+9e. Unmarked Group (n = 1, nSub = 1)
+```{r}
+# Only Isaac, Subordinate
+group_by(dryGUnmarked, Rank) %>%
+  summarise(
+    mean = mean(TotalTestesMass, na.rm = TRUE)
+  )
+```
+
+
+# Fecundity
+
+Packages
+```{r}
+library(dplyr)
+library(lme4)
+library(lmerTest)
+library(glmmML)
+library(nlme)
+```
+
+1. Import Data
+```{r}
+library(readxl)
+AllAdultFemales <- read_excel("~/Google Drive/Projects/Fecundity/AllAdultFemales.xlsx")
+```
+
+2. Subset Data to Just Adult Females 
+```{r}
+dummy <- AllAdultFemales[AllAdultFemales$CaptureSeason != "2007a", ]
+dummy$AvgTailCrown <- as.numeric(dummy$AvgTailCrown)
+AdultFemales <- dummy[dummy$Age >= 5, ]
+AdultFemalesIncl4 <- dummy[dummy$Age >= 4, ]
+belowAdult <- dummy[dummy$Age <= 4, ]
+```
+
+## 3. Did they give birth? 
+
+3a. WEIGHT: Did they give birth? Including Age 4 (which is technically 5)
+
+```{r}
+#AdultFemalesIncl4$GaveBirth <- factor(AdultFemalesIncl4$GaveBirth)
+AdultFemalesIncl4$LemurID <- factor(AdultFemalesIncl4$LemurID)
+lmAFBirthWeight <- glmer(GaveBirthNum ~ Weight + (1|LemurID), data = AdultFemalesIncl4, family = binomial)
+summary(lmAFBirthWeight)
+```
+
+3a. Visualize
+```{r}
+group_by(AdultFemalesIncl4, GaveBirth) %>%
+  summarise(
+    median = median(Weight, na.rm = TRUE),
+    mean = mean(Weight, na.rm = TRUE),
+    IQR = IQR(Weight, na.rm = TRUE),
+    sd = sd(Weight, na.rm = TRUE)
+  )
+```
+
+3b. TAIL-CROWN: Did they give birth? Including Age 4
+No significance 
+```{r}
+lmAFBirthTC <- lmer(AvgTailCrown ~ GaveBirth + (1|LemurID), data = AdultFemalesIncl4)
+summary(lmAFBirthTC)
+```
+
+3b. Visualize
+```{r}
+group_by(AdultFemalesIncl4, GaveBirth) %>%
+  summarise(
+    median = median(AvgTailCrown, na.rm = TRUE),
+    mean = mean(AvgTailCrown, na.rm = TRUE),
+    IQR = IQR(AvgTailCrown, na.rm = TRUE),
+    sd = sd(AvgTailCrown, na.rm = TRUE)
+  )
+```
+
+3c. WEIGHT: Did they give birth? Only 5+
+Significant but less so
+```{r}
+lmAF5BirthWeight <- lmer(Weight ~ GaveBirth + (1|LemurID), data = AdultFemales)
+summary(lmAF5BirthWeight)
+```
+
+3c. Visualize
+```{r}
+group_by(AdultFemales, GaveBirth) %>%
+  summarise(
+    median = median(Weight, na.rm = TRUE),
+    mean = mean(Weight, na.rm = TRUE),
+    IQR = IQR(Weight, na.rm = TRUE),
+    sd = sd(Weight, na.rm = TRUE)
+  )
+```
+
+## 4. Infant Survival to Age 1
+
+4a. WEIGHT: Infant Survival to Age 1: Including Age 4
+Not Significant
+```{r}
+lmAFInfSurv <- lmer(Weight ~ SurvivedOneYear + (1|LemurID), data = AdultFemalesIncl4)
+summary(lmAFInfSurv)
+```
+
+4a. Visualize
+```{r}
+group_by(AdultFemalesIncl4, SurvivedOneYear) %>%
+  summarise(
+    median = median(Weight, na.rm = TRUE),
+    mean = mean(Weight, na.rm = TRUE),
+    IQR = IQR(Weight, na.rm = TRUE),
+    sd = sd(Weight, na.rm = TRUE)
+  )
+```
+
+4b. TAIL-CROWN: Infant Survival to Age 1: Including Age 4
+Not Significant
+```{r}
+lmAFInfSurvTC <- lmer(AvgTailCrown ~ SurvivedOneYear + (1|LemurID), data = AdultFemalesIncl4)
+summary(lmAFInfSurvTC)
+```
+
+4b. Visualize
+```{r}
+group_by(AdultFemales, SurvivedOneYear) %>%
+  summarise(
+    median = median(AvgTailCrown, na.rm = TRUE),
+    mean = mean(AvgTailCrown, na.rm = TRUE),
+    IQR = IQR(AvgTailCrown, na.rm = TRUE),
+    sd = sd(AvgTailCrown, na.rm = TRUE)
+  )
+```
+
+4c. WEIGHT: Infant Survival to Age 1: Only 5+
+Not Significant
+```{r}
+lmAFInfSurv5 <- lmer(Weight ~ SurvivedOneYear + (1|LemurID), data = AdultFemales)
+summary(lmAFInfSurv5)
+```
+
+4c. Visualize
+```{r}
+group_by(AdultFemales, SurvivedOneYear) %>%
+  summarise(
+    median = median(Weight, na.rm = TRUE),
+    mean = mean(Weight, na.rm = TRUE),
+    IQR = IQR(Weight, na.rm = TRUE),
+    sd = sd(Weight, na.rm = TRUE)
+  )
+```
+
+## 5. Infant Weight at Age 1ish
+
+5a. WEIGHT: Infant Weight at Age 1ish: Including Age 4
+```{r}
+AdultFemalesIncl4$InfWeightAge <- as.numeric(AdultFemalesIncl4$InfWeightAge)
+lmAFInfWt <- lmer(InfWeightAge ~ Weight + (1|LemurID), data = filter(AdultFemalesIncl4, !is.na(InfWeightAge)))
+summary(lmAFInfWt)
+```
+
+
+5b. TAIL-CROWN: Infant Weight at Age 1ish: Including Age 4
+
+5c. WEIGHT: Infant Weight at Age 1ish: Only 5+
