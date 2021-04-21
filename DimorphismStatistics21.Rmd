@@ -196,7 +196,7 @@ library(nlme)
 1. Import Data
 ```{r}
 library(readxl)
-AllAdultFemales <- read_excel("~/Google Drive/Projects/Fecundity/AllAdultFemales.xlsx")
+AllAdultFemales <- read_excel("AllAdultFemales.xlsx")
 ```
 
 2. Subset Data to Just Adult Females 
